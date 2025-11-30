@@ -1,1 +1,4 @@
-WeasyPrint
+Flask
+Flask-Cors
+xhtml2pdf
+requests
