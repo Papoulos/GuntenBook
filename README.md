@@ -9,3 +9,39 @@
   <a href="https://aistudio.google.com/apps">Start building</a>
 
 </div>
+
+---
+
+## HTML to PDF Conversion
+
+This project includes a Python script to convert an HTML file to a PDF document.
+
+### Prerequisites
+
+- Python 3.x
+- pip
+
+### Setup
+
+1.  **Install dependencies:**
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Usage
+
+1.  **Place your HTML file:**
+
+    Make sure you have an `input.html` file in the root directory of the project. A sample file is provided.
+
+2.  **Run the script:**
+
+    To convert `input.html` to `output.pdf`, run the following command:
+    ```bash
+    python3 convert.py input.html output.pdf
+    ```
+
+3.  **Find the output:**
+
+    The script will generate the specified PDF file (e.g., `output.pdf`) in the root directory.
