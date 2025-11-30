@@ -1,1 +1,3 @@
 WeasyPrint
+Flask
+Flask-Cors
