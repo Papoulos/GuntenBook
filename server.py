@@ -14,24 +14,21 @@ CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 def clean_gutenberg_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # Find and remove Gutenberg header
+    # Find the start of the book, often marked with a specific comment or element
     start_marker = soup.find(string=lambda text: "*** START OF THE PROJECT GUTENBERG EBOOK" in text)
     if start_marker:
-        container = start_marker.find_parent()
-        # Ensure we have a tag and not the root
-        if container and container.name != '[document]':
-            for sibling in list(container.find_previous_siblings()):
-                sibling.decompose()
-            container.decompose()
+        # Remove everything before the start marker's parent element
+        for element in list(start_marker.find_all_previous()):
+            element.decompose()
+        start_marker.parent.decompose()
 
-    # Find and remove Gutenberg footer
+    # Find the end of the book, also often marked
     end_marker = soup.find(string=lambda text: "*** END OF THE PROJECT GUTENBERG EBOOK" in text)
     if end_marker:
-        container = end_marker.find_parent()
-        if container and container.name != '[document]':
-            for sibling in list(container.find_next_siblings()):
-                sibling.decompose()
-            container.decompose()
+        # Remove everything after the end marker's parent element
+        for element in list(end_marker.find_all_next()):
+            element.decompose()
+        end_marker.parent.decompose()
 
     # Remove script and style tags
     for tag in soup(['script', 'style']):
