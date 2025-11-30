@@ -12,18 +12,28 @@ Une application web pour rechercher des livres sur le Projet Gutenberg, visualis
 - Node.js
 - Python 3
 
+### Installation
+
+1.  **Installer les dépendances du frontend :**
+    ```bash
+    npm install
+    ```
+
+2.  **Installer les dépendances du backend :**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
 ### Démarrage de l'application
 
-Pour installer toutes les dépendances, construire le frontend et démarrer le serveur, exécutez simplement la commande suivante :
+Pour démarrer à la fois le serveur de développement frontend et le serveur backend Flask, exécutez la commande suivante :
 
 ```bash
 npm start
 ```
 
-Cette commande s'occupera de tout :
-1.  Installation des dépendances `npm`.
-2.  Construction de l'application React en fichiers statiques.
-3.  Installation des dépendances `pip`.
-4.  Démarrage du serveur Flask qui servira l'application et gérera les conversions de PDF.
+Cela lancera :
+- Le serveur frontend Vite sur `http://localhost:3001`
+- Le serveur backend Flask sur `http://localhost:5001`
 
-Une fois la commande terminée, vous pouvez accéder à l'application à l'adresse **http://localhost:5001**.
+L'application devrait s'ouvrir automatiquement dans votre navigateur. Si ce n'est pas le cas, vous pouvez y accéder manuellement à l'adresse `http://localhost:3001`.

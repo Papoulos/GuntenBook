@@ -45,7 +45,8 @@ export const fetchBookContent = async (url: string): Promise<string> => {
 };
 
 export const convertToPdf = async (htmlContent: string): Promise<Blob> => {
-  const response = await fetch('/api/convert', {
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const response = await fetch(`${apiUrl}/api/convert`, {
     method: 'POST',
     headers: {
       'Content-Type': 'text/html',
