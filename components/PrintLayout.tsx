@@ -76,7 +76,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
           title="Book Content"
           srcDoc={book.htmlContent}
           className="w-full h-full border-none"
-          sandbox="allow-same-origin" 
+          sandbox="allow-same-origin allow-scripts"
         />
       </div>
     </div>
