@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { HtmlBook } from '../types';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { convertToPdf } from '../services/bookService';
+
 
 interface PrintLayoutProps {
   book: HtmlBook;
@@ -8,11 +10,33 @@ interface PrintLayoutProps {
 }
 
 const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const blob = await convertToPdf(book.htmlContent);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${book.title}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Une erreur s'est produite lors de la génération du PDF. Veuillez réessayer.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-slate-100">
       {/* Toolbar */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-10">
-        <button 
+        <button
           onClick={onBack}
           className="flex items-center text-slate-600 hover:text-indigo-600 transition-colors font-medium"
         >
@@ -25,7 +49,21 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
           <p className="text-xs text-slate-500">{book.author}</p>
         </div>
 
-        <div className="w-20"></div> {/* Spacer to center title */}
+        <div className="flex items-center justify-end" style={{ minWidth: '150px' }}>
+          <button
+            onClick={handleDownload}
+            disabled={isDownloading}
+            className="flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
+          >
+            {isDownloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 mr-2" />
+            )}
+            <span className="hidden sm:inline">{isDownloading ? 'Génération...' : 'Télécharger en PDF'}</span>
+            <span className="sm:hidden">{isDownloading ? '' : 'PDF'}</span>
+          </button>
+        </div>
       </div>
 
       {/* HTML Content Viewer */}
