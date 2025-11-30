@@ -1,0 +1,5 @@
+{
+  "name": "GutenPrint",
+  "description": "Récupération et affichage de livres Project Gutenberg (Format HTML).",
+  "requestFramePermissions": []
+}

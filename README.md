@@ -1,47 +1,20 @@
 <div align="center">
-
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-
-  <h1>Built with AI Studio</h2>
-
-  <p>The fastest path from prompt to production with Gemini.</p>
-
-  <a href="https://aistudio.google.com/apps">Start building</a>
-
 </div>
 
----
+# Run and deploy your AI Studio app
 
-## HTML to PDF Conversion
+This contains everything you need to run your app locally.
 
-This project includes a Python script to convert an HTML file to a PDF document.
+View your app in AI Studio: https://ai.studio/apps/drive/1UaD53IDgOZ7dRArEm1zGY9JcnDZxFMHz
 
-### Prerequisites
+## Run Locally
 
-- Python 3.x
-- pip
+**Prerequisites:**  Node.js
 
-### Setup
 
-1.  **Install dependencies:**
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-### Usage
-
-1.  **Place your HTML file:**
-
-    Make sure you have an `input.html` file in the root directory of the project. A sample file is provided.
-
-2.  **Run the script:**
-
-    To convert `input.html` to `output.pdf`, run the following command:
-    ```bash
-    python3 convert.py input.html output.pdf
-    ```
-
-3.  **Find the output:**
-
-    The script will generate the specified PDF file (e.g., `output.pdf`) in the root directory.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
