@@ -15,7 +15,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const blob = await convertToPdf(book.htmlUrl);
+      const blob = await convertToPdf(book.htmlContent);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -76,7 +76,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
           title="Book Content"
           srcDoc={book.htmlContent}
           className="w-full h-full border-none"
-          sandbox="allow-same-origin" 
+          sandbox="allow-same-origin allow-scripts"
         />
       </div>
     </div>
