@@ -18,4 +18,5 @@ export interface HtmlBook {
   title: string;
   author: string;
   htmlContent: string;
+  htmlUrl: string;
 }

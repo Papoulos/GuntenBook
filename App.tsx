@@ -33,7 +33,8 @@ const App: React.FC = () => {
       setSelectedBook({
         title: book.title,
         author: book.authors.map(a => a.name).join(", "),
-        htmlContent: rawHtml
+        htmlContent: rawHtml,
+        htmlUrl: htmlUrl
       });
       
       setCurrentView('reading');
