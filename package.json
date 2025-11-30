@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "npm install && npm run build && pip install -r requirements.txt && python3 server.py",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.30.0",
     "lucide-react": "^0.555.0",
-    "react-dom": "^19.2.0",
     "react": "^19.2.0",
-    "@google/genai": "^1.30.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

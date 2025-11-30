@@ -2,19 +2,28 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Gutenprint
 
-This contains everything you need to run your app locally.
+Une application web pour rechercher des livres sur le Projet Gutenberg, visualiser leur contenu HTML et les convertir en PDF.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1UaD53IDgOZ7dRArEm1zGY9JcnDZxFMHz
+## Exécution locale
 
-## Run Locally
+### Prérequis
+- Node.js
+- Python 3
 
-**Prerequisites:**  Node.js
+### Démarrage de l'application
 
+Pour installer toutes les dépendances, construire le frontend et démarrer le serveur, exécutez simplement la commande suivante :
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm start
+```
+
+Cette commande s'occupera de tout :
+1.  Installation des dépendances `npm`.
+2.  Construction de l'application React en fichiers statiques.
+3.  Installation des dépendances `pip`.
+4.  Démarrage du serveur Flask qui servira l'application et gérera les conversions de PDF.
+
+Une fois la commande terminée, vous pouvez accéder à l'application à l'adresse **http://localhost:5001**.
