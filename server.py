@@ -2,7 +2,6 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import io
 import os
-from itertools import takewhile
 from weasyprint import HTML, CSS
 from bs4 import BeautifulSoup
 
@@ -15,38 +14,32 @@ CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 def clean_gutenberg_html(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    start_marker = soup.find(string=lambda t: "*** START OF THE PROJECT GUTENBERG EBOOK" in t)
-    end_marker = soup.find(string=lambda t: "*** END OF THE PROJECT GUTENBERG EBOOK" in t)
+    # Find the start of the book, often marked with a specific comment or element
+    start_marker = soup.find(string=lambda text: "*** START OF THE PROJECT GUTENBERG EBOOK" in text)
+    if start_marker:
+        # Remove everything before the start marker's parent element
+        for element in list(start_marker.find_all_previous()):
+            element.decompose()
+        start_marker.parent.decompose()
 
-    # Fallback for when markers are not found
-    if not start_marker or not end_marker:
-        for tag in soup(['script', 'style']):
-            tag.decompose()
-        title_tag = soup.find('h1')
-        if title_tag:
-            title_tag.wrap(soup.new_tag('div', **{'class': 'title-page'}))
-        return str(soup)
+    # Find the end of the book, also often marked
+    end_marker = soup.find(string=lambda text: "*** END OF THE PROJECT GUTENBERG EBOOK" in text)
+    if end_marker:
+        # Remove everything after the end marker's parent element
+        for element in list(end_marker.find_all_next()):
+            element.decompose()
+        end_marker.parent.decompose()
 
-    # More robustly extract content between markers
-    content_iterator = start_marker.find_all_next()
-    book_content_tags = takewhile(lambda t: t != end_marker, content_iterator)
-
-    # Create a new document with only the book content
-    new_soup = BeautifulSoup('<!DOCTYPE html><html><body></body></html>', 'html.parser')
-    body = new_soup.body
-    for tag in book_content_tags:
-        # The iterator yields NavigableStrings and Tags, so handle both
-        body.append(tag.extract())
-
-    # Perform final cleanup on the new document
-    for tag in body(['script', 'style']):
+    # Remove script and style tags
+    for tag in soup(['script', 'style']):
         tag.decompose()
 
-    title_tag = body.find('h1')
+    # Find the title and wrap it for the title page
+    title_tag = soup.find('h1')
     if title_tag:
-        title_tag.wrap(new_soup.new_tag('div', **{'class': 'title-page'}))
+        title_tag.wrap(soup.new_tag('div', **{'class': 'title-page'}))
 
-    return str(new_soup)
+    return str(soup)
 
 
 @app.route('/api/convert', methods=['POST'])
