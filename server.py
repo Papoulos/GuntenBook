@@ -2,14 +2,13 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import io
 import os
-from xhtml2pdf import pisa
+from weasyprint import HTML
 
 app = Flask(__name__)
 
-# Configure CORS to allow multiple origins for development
-default_origins = "http://localhost:3000,http://localhost:3001"
-allowed_origins = os.environ.get('FRONTEND_URLS', default_origins).split(',')
-CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
+# Configure CORS
+frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3001')
+CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
 
 @app.route('/api/convert', methods=['POST'])
@@ -19,14 +18,10 @@ def convert_to_pdf():
         return jsonify({"error": "Request payload is too large."}), 413
 
     try:
-        html_content = request.data
+        html_content = request.data.decode('utf-8')
 
         pdf_file = io.BytesIO()
-        pisa_status = pisa.CreatePDF(io.BytesIO(html_content), dest=pdf_file)
-
-        if pisa_status.err:
-            raise Exception("PDF creation error")
-
+        HTML(string=html_content).write_pdf(pdf_file)
         pdf_file.seek(0)
 
         return send_file(
