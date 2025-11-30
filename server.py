@@ -20,7 +20,8 @@ def clean_gutenberg_html(html_content):
         # Remove everything before the start marker's parent element
         for element in list(start_marker.find_all_previous()):
             element.decompose()
-        start_marker.parent.decompose()
+        if start_marker.parent:
+            start_marker.parent.decompose()
 
     # Find the end of the book, also often marked
     end_marker = soup.find(string=lambda text: "*** END OF THE PROJECT GUTENBERG EBOOK" in text)
@@ -28,7 +29,8 @@ def clean_gutenberg_html(html_content):
         # Remove everything after the end marker's parent element
         for element in list(end_marker.find_all_next()):
             element.decompose()
-        end_marker.parent.decompose()
+        if end_marker.parent:
+            end_marker.parent.decompose()
 
     # Remove script and style tags
     for tag in soup(['script', 'style']):
