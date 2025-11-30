@@ -1,0 +1,6 @@
+# Generated files
+output.pdf
+
+# Python cache
+__pycache__/
+*.pyc
