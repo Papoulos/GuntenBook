@@ -1,3 +1,4 @@
 WeasyPrint
 Flask
 Flask-Cors
+beautifulsoup4
