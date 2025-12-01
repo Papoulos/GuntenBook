@@ -111,6 +111,9 @@ def convert_to_pdf():
     if request.content_length > 10 * 1024 * 1024:  # 10 MB limit
         return jsonify({"error": "Request payload is too large."}), 413
 
+    if not request.is_json:
+        return jsonify({"error": "Unsupported Media Type. Must be application/json."}), 415
+
     try:
         data = request.get_json()
         html_content = data.get('html_content')
