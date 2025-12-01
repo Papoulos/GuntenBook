@@ -127,10 +127,10 @@ def convert_to_pdf():
 
         cleaned_html = clean_gutenberg_html(html_content, title, author)
 
-        css_string = css_string = """
+        css_string = """
     @page {
         size: A5;
-        margin: 2cm;
+        margin: 1cm 2cm;
         @bottom-center {
             content: counter(page);
         }
@@ -141,11 +141,21 @@ def convert_to_pdf():
             content: none;
         }
     }
+    /* No page number on the second page (Blank Page) */
+    @page :nth(2) {
+        @bottom-center {
+            content: none;
+        }
+    }
 
     body {
-        font-size: 10pt;
+        font-size: 8pt;
         font-family: serif;
         line-height: 1.5;
+    }
+    p {
+        margin-top: 0;
+        margin-bottom: 0.5em;
     }
     /* Title Page Styling */
     .title-page {
@@ -153,7 +163,7 @@ def convert_to_pdf():
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 170mm; /* A5 height 210mm minus 2cm top + 2cm bottom margins */
+        height: 190mm; /* A5 height 210mm minus 1cm top + 1cm bottom margins */
         text-align: center;
         page-break-after: always;
     }
