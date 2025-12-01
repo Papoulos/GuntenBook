@@ -12,23 +12,10 @@ app = Flask(__name__)
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
-def clean_gutenberg_html(html_content):
+def clean_gutenberg_html(html_content, title=None, author=None):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # 1. Extract Title and Author (before any cleanup)
-    title_tag = soup.find('h1')
-    author_tag = None
-    
-    if title_tag:
-        # Look for author in the next few elements
-        for sibling in title_tag.find_next_siblings(limit=5):
-            if isinstance(sibling, Tag) and sibling.name in ['h2', 'h3', 'p']:
-                text = sibling.get_text(strip=True)
-                if text and len(text) < 100 and "Chapter" not in text:
-                    author_tag = sibling
-                    break
-
-    # 2. Create New Body
+    # 1. Create New Body
     new_body = soup.new_tag('body')
     
     # 3. Add Title Page (if a title was found)
@@ -125,9 +112,15 @@ def convert_to_pdf():
         return jsonify({"error": "Request payload is too large."}), 413
 
     try:
-        html_content = request.data.decode('utf-8')
+        data = request.get_json()
+        html_content = data.get('html_content')
+        title = data.get('title')
+        author = data.get('author')
 
-        cleaned_html = clean_gutenberg_html(html_content)
+        if not html_content:
+            return jsonify({"error": "html_content is required."}), 400
+
+        cleaned_html = clean_gutenberg_html(html_content, title, author)
 
         css_string = """
             @page {
@@ -145,7 +138,7 @@ def convert_to_pdf():
             }
             
             body {
-                font-size: 12pt;
+                font-size: 10pt;
                 font-family: serif;
             }
 
