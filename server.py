@@ -14,81 +14,98 @@ CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
 def clean_gutenberg_html(html_content, title=None, author=None):
     soup = BeautifulSoup(html_content, 'html.parser')
-    
+
+    # --- 1. Suppression fiable du HEADER Gutenberg ---
+    start_marker_text = r'\*\*\*\s*START OF (THE|THIS)?\s*PROJECT GUTENBERG EBOOK'
+    start_marker = soup.find(string=lambda t: t and re.search(start_marker_text, t, re.IGNORECASE | re.DOTALL))
+
+    if start_marker:
+        element_to_delete = start_marker.parent
+        while element_to_delete.parent != soup.body and element_to_delete.parent is not None:
+            element_to_delete = element_to_delete.parent
+        for sibling in list(element_to_delete.find_previous_siblings()):
+            sibling.decompose()
+        element_to_delete.decompose()
+
+    # --- 2. Suppression fiable du FOOTER Gutenberg ---
+    end_marker_text = r'\*\*\*\s*END OF (THE|THIS)?\s*PROJECT GUTENBERG EBOOK.*'
+    end_marker = soup.find(string=lambda t: t and re.search(end_marker_text, t, re.IGNORECASE | re.DOTALL))
+
+    if end_marker:
+        element_to_delete = end_marker.parent
+        while element_to_delete.parent != soup.body and element_to_delete.parent is not None:
+            element_to_delete = element_to_delete.parent
+        for sibling in list(element_to_delete.find_next_siblings()):
+            sibling.decompose()
+        element_to_delete.decompose()
+
+    # --- 3. Si le body est vide maintenant, on crée un body minimal ---
+    if not soup.body or not soup.body.contents:
+        soup.body = soup.new_tag('body')
+
+    # --- 4. Détection des chapitres pour les sauts de page (amélioré avec plus de variantes) ---
     chapter_pattern = re.compile(
         r'^\s*'
-        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion)'
-        r'(?:\s+[IVXLCDM\d]+)?\s*\.?\s*$'
+        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion|Chapitre premier|Chapitre dernier|Prologue|Épilogue)'
+        r'(?:\s+[IVXLCDM\d]+)?[\s\.:-]*$'
         r'|'
-        r'^\s*M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})\.?\s*$',
+        r'^\s*M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})[\s\.:-]*$',
         re.IGNORECASE
     )
 
-    if soup.body:
-        # 1. Remove Gutenberg Footer
-        end_marker_text = '*** END OF THE PROJECT GUTENBERG EBOOK'
-        end_marker = soup.find(string=lambda text: text and end_marker_text in text)
+    # --- Nouvelle étape : Suppression de tout avant le premier chapitre ou préface ---
+    first_content_element = None
+    for header in soup.body.find_all(['h1', 'h2', 'h3']):
+        text = header.get_text(strip=True)
+        if chapter_pattern.match(text):
+            first_content_element = header
+            break
 
-        if end_marker:
-            # Find the parent element of the marker text
-            element_to_delete = end_marker.find_parent()
-            if element_to_delete:
-                # Remove all following siblings of the parent element
-                for sibling in list(element_to_delete.find_next_siblings()):
-                    sibling.decompose()
-                # Remove the parent element itself
-                element_to_delete.decompose()
+    if first_content_element:
+        element_to_keep = first_content_element
+        while element_to_keep.parent != soup.body and element_to_keep.parent is not None:
+            element_to_keep = element_to_keep.parent
+        for sibling in list(element_to_keep.find_previous_siblings()):
+            sibling.decompose()
 
-        # 2. Remove Gutenberg Header
-        first_content_element = None
-        for header in soup.body.find_all(['h1', 'h2', 'h3']):
-            if chapter_pattern.match(header.get_text(strip=True)):
-                first_content_element = header
-                break
-        
-        if first_content_element:
-            for element in list(first_content_element.find_previous_siblings()):
-                element.extract()
-
-    # 3. Create New Body for PDF structure
+    # --- 5. Création du nouveau body propre ---
     new_body = soup.new_tag('body')
 
-    # 4. Add Title Page (if a title was provided)
+    # --- 6. Page de titre ---
     if title:
         title_page = soup.new_tag('div', **{'class': 'title-page'})
-        title_tag = soup.new_tag('h1')
-        title_tag.string = title
-        title_page.append(title_tag)
-
+        h1 = soup.new_tag('h1')
+        h1.string = title
+        title_page.append(h1)
         if author:
-            author_tag = soup.new_tag('p', **{'class': 'author'})
-            author_tag.string = author
-            title_page.append(author_tag)
-
+            p_author = soup.new_tag('p', **{'class': 'author'})
+            p_author.string = author
+            title_page.append(p_author)
         new_body.append(title_page)
         new_body.append(soup.new_tag('div', **{'class': 'blank-page'}))
 
-    # 5. Process content and identify chapters
-    if soup.body:
-        headers = soup.body.find_all(['h1', 'h2', 'h3'])
-        is_first_chapter = True
-        for header in headers:
-            if chapter_pattern.match(header.get_text(strip=True)):
-                if is_first_chapter:
-                    is_first_chapter = False  # Skip adding class to the first chapter
+    # --- 7. Ajout du contenu nettoyé + marquage des chapitres ---
+    is_first_chapter = True
+    for element in list(soup.body.children):  # list() pour éviter modifications pendant itération
+        if isinstance(element, Tag) and element.name in ['h1', 'h2', 'h3']:
+            text = element.get_text(strip=True)
+            if chapter_pattern.match(text):
+                if not is_first_chapter:
+                    element['class'] = element.get('class', []) + ['section-break']
                 else:
-                    header['class'] = header.get('class', []) + ['section-break']
-        
-        new_body.extend(list(soup.body.contents))
+                    is_first_chapter = False
+        if isinstance(element, Tag):
+            new_body.append(element)
+        elif isinstance(element, NavigableString) and element.strip():
+            new_body.append(element)
 
-    # 6. Replace Old Body
+    # --- 8. Remplacement du body ---
     if soup.body:
         soup.body.replace_with(new_body)
     else:
         soup.append(new_body)
 
     return str(soup)
-
 
 @app.route('/api/convert', methods=['POST'])
 def convert_to_pdf():
@@ -113,18 +130,18 @@ def convert_to_pdf():
         css_string = """
             @page {
                 size: A5;
-                margin: 2cm;
+                margin: 1.5cm 2cm 2cm 2cm;  /* top, right, bottom, left */
                 @bottom-center {
                     content: counter(page);
+                    font-size: 9pt;
+                    vertical-align: middle;
                 }
             }
-            /* No page number on the first page (Title Page) */
-            @page :first {
-                @bottom-center {
-                    content: none;
-                }
+            @page :first, @page blank {
+                @bottom-center { content: none; }
             }
-            
+            .blank-page { page-break-after: always; height: 1px; }
+
             body {
                 font-size: 10pt;
                 font-family: serif;
@@ -141,12 +158,12 @@ def convert_to_pdf():
                 text-align: center;
                 page-break-after: always;
             }
-            
+
             .title-page h1 {
                 margin-bottom: 1em;
                 font-size: 2em;
             }
-            
+
             .title-page .author {
                 font-size: 1.5em;
                 font-style: italic;
@@ -164,12 +181,12 @@ def convert_to_pdf():
             .section-break {
                 page-break-before: always;
             }
-            
+
             /* Ensure h1 always breaks page (except on title page, handled by structure) */
             h1 {
                 page-break-before: always;
             }
-            
+
             /* Override for title page h1 to avoid double break if logic fails */
             .title-page h1 {
                 page-break-before: avoid;
