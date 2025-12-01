@@ -127,71 +127,68 @@ def convert_to_pdf():
 
         cleaned_html = clean_gutenberg_html(html_content, title, author)
 
-        css_string = """
-            @page {
-                size: A5;
-                margin: 1.5cm 2cm 2cm 2cm;  /* top, right, bottom, left */
-                @bottom-center {
-                    content: counter(page);
-                    font-size: 9pt;
-                    vertical-align: middle;
-                }
-            }
-            @page :first, @page blank {
-                @bottom-center { content: none; }
-            }
-            .blank-page { page-break-after: always; height: 1px; }
+        css_string = css_string = """
+    @page {
+        size: A5;
+        margin: 2cm;
+        @bottom-center {
+            content: counter(page);
+        }
+    }
+    /* No page number on the first page (Title Page) */
+    @page :first {
+        @bottom-center {
+            content: none;
+        }
+    }
 
-            body {
-                font-size: 10pt;
-                font-family: serif;
-                line-height: 1.5;
-            }
+    body {
+        font-size: 10pt;
+        font-family: serif;
+        line-height: 1.5;
+    }
+    /* Title Page Styling */
+    .title-page {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 170mm; /* A5 height 210mm minus 2cm top + 2cm bottom margins */
+        text-align: center;
+        page-break-after: always;
+    }
 
-            /* Title Page Styling */
-            .title-page {
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                text-align: center;
-                page-break-after: always;
-            }
+    .title-page h1 {
+        margin-bottom: 1em;
+        font-size: 2em;
+    }
 
-            .title-page h1 {
-                margin-bottom: 1em;
-                font-size: 2em;
-            }
+    .title-page .author {
+        font-size: 1.5em;
+        font-style: italic;
+    }
+    /* Blank Page Styling */
+    .blank-page {
+        page-break-after: always;
+        content: "";
+        display: block;
+        height: 1px; /* Minimal height to ensure it renders */
+    }
+    /* Section Breaks */
+    .section-break {
+        page-break-before: always;
+    }
 
-            .title-page .author {
-                font-size: 1.5em;
-                font-style: italic;
-            }
+    /* Ensure h1 always breaks page (except on title page, handled by structure) */
+    h1 {
+        page-break-before: always;
+    }
 
-            /* Blank Page Styling */
-            .blank-page {
-                page-break-after: always;
-                content: "";
-                display: block;
-                height: 1px; /* Minimal height to ensure it renders */
-            }
-
-            /* Section Breaks */
-            .section-break {
-                page-break-before: always;
-            }
-
-            /* Ensure h1 always breaks page (except on title page, handled by structure) */
-            h1 {
-                page-break-before: always;
-            }
-
-            /* Override for title page h1 to avoid double break if logic fails */
-            .title-page h1 {
-                page-break-before: avoid;
-            }
-        """
+    /* Override for title page h1 to avoid double break if logic fails */
+    .title-page h1 {
+        page-break-before: avoid;
+    }
+"""
 
         pdf_file = io.BytesIO()
         HTML(string=cleaned_html).write_pdf(pdf_file, stylesheets=[CSS(string=css_string)])
