@@ -30,14 +30,11 @@ def clean_gutenberg_html(html_content, title=None, author=None):
         end_marker = soup.find(string=lambda text: text and end_marker_text in text)
 
         if end_marker:
-            # Find the parent element of the marker text
-            element_to_delete = end_marker.find_parent()
-            if element_to_delete:
-                # Remove all following siblings of the parent element
-                for sibling in list(element_to_delete.find_next_siblings()):
-                    sibling.decompose()
-                # Remove the parent element itself
-                element_to_delete.decompose()
+            parent_to_remove = end_marker.find_parent('p') or end_marker.find_parent()
+            if parent_to_remove and parent_to_remove.name != 'body':
+                for sibling in list(parent_to_remove.find_next_siblings()):
+                    sibling.extract()
+                parent_to_remove.extract()
 
         # 2. Remove Gutenberg Header
         first_content_element = None
@@ -68,17 +65,40 @@ def clean_gutenberg_html(html_content, title=None, author=None):
         new_body.append(title_page)
         new_body.append(soup.new_tag('div', **{'class': 'blank-page'}))
 
+        # 4. Add a blank page after the title page
+        blank_page = soup.new_tag('div', **{'class': 'blank-page'})
+        new_body.append(blank_page)
+
     # 5. Process content and identify chapters
+    chapter_pattern = re.compile(
+        r'^\s*'                                 # Optional leading whitespace
+        r'(?:'                                  # Start of non-capturing group for keywords
+        r'Chapitre|'
+        r'Livre|'
+        r'Partie|'
+        r'Lettre|'
+        r'Préface|'
+        r'Introduction|'
+        r'Conclusion'
+        r')'                                    # End of keyword group
+        r'(?:\s+[IVXLCDM\d]+)?'                 # Optional space and Roman/Arabic number
+        r'\s*\.?\s*$'                           # Optional trailing whitespace/period
+        r'|'                                    # OR
+        r'^\s*'                                 # Standalone Roman numerals
+        r'M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})'
+        r'\.?\s*$'                              # Optional period and trailing space
+        , re.IGNORECASE
+    )
+    
     if soup.body:
+        # Find all relevant headers and mark them as chapters if they match
         headers = soup.body.find_all(['h1', 'h2', 'h3'])
-        is_first_chapter = True
         for header in headers:
+            # Using .get_text() with strip=True to handle whitespace
             if chapter_pattern.match(header.get_text(strip=True)):
-                if is_first_chapter:
-                    is_first_chapter = False  # Skip adding class to the first chapter
-                else:
-                    header['class'] = header.get('class', []) + ['section-break']
+                header['class'] = header.get('class', []) + ['section-break']
         
+        # Move all content from the old body to the new one
         new_body.extend(list(soup.body.contents))
 
     # 6. Replace Old Body
