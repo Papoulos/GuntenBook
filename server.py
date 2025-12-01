@@ -43,64 +43,42 @@ def clean_gutenberg_html(html_content, title=None, author=None):
     # We scan the original body for headers matching our criteria
     # and append them + their content to the new body.
     
-    # Find all potential section headers
+    # Find all potential section headers and process them hierarchically
     headers = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
-    
-    current_section_container = None
-    
-    # Regex to detect chapter headers (keywords or Roman numerals)
-    chapter_pattern = re.compile(
-        r'^(Préface|Preface|Chapitre|Chapter|Lettre)\b.*'
-        r'|^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$',
-        re.IGNORECASE
-    )
+    processed_elements = set()
 
     for header in headers:
-        text = header.get_text(strip=True)
+        if header in processed_elements:
+            continue
+
+        # This header starts a new section
+        try:
+            current_level = int(header.name[1])
+        except (ValueError, IndexError):
+            current_level = 6  # Fallback
+
+        header['class'] = header.get('class', []) + ['section-break']
         
-        if chapter_pattern.match(text):
-            # Determine the level of the current header (e.g., 2 for h2)
-            try:
-                current_level = int(header.name[1])
-            except (ValueError, IndexError):
-                current_level = 6 # Fallback
-            
-            # Add section break class to header
-            header['class'] = header.get('class', []) + ['section-break']
-            
-            # We need to capture the next sibling BEFORE we move the header
-            curr = header.next_sibling
-            
-            # Append header to new body
-            new_body.append(header)
-            
-            # Append all siblings until the next major header
-            while curr:
-                next_node = curr.next_sibling
-                element_to_move = curr
-                
-                # Check if we hit another header
-                if isinstance(element_to_move, Tag) and element_to_move.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                     curr_text = element_to_move.get_text(strip=True)
-                     
-                     # Check if it's a target section (always stop)
-                     if chapter_pattern.match(curr_text):
-                         break
+        # Append the header itself
+        new_body.append(header)
+        processed_elements.add(header)
 
-                     # Check if it's a header of same or higher importance (e.g. h2 -> h2, or h2 -> h1)
-                     # This implies end of current section and start of an ignored section
-                     try:
-                         new_level = int(element_to_move.name[1])
-                         if new_level <= current_level:
-                             break
-                     except (ValueError, IndexError):
-                         pass
+        # Append all subsequent siblings until the next section header
+        for sibling in header.find_next_siblings():
+            if sibling in processed_elements:
+                continue
 
-                # Move the element to the new body
-                new_body.append(element_to_move)
-                
-                # Advance to the next node in the ORIGINAL tree
-                curr = next_node
+            # Check if we've hit a new section of equal or higher importance
+            if isinstance(sibling, Tag) and sibling.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                try:
+                    sibling_level = int(sibling.name[1])
+                    if sibling_level <= current_level:
+                        break  # End of the current section
+                except (ValueError, IndexError):
+                    pass
+
+            new_body.append(sibling)
+            processed_elements.add(sibling)
 
     # 6. Replace Old Body
     if soup.body:
