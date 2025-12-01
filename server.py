@@ -2,6 +2,7 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import io
 import os
+import re
 from weasyprint import HTML, CSS
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -11,55 +12,52 @@ app = Flask(__name__)
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
-def clean_gutenberg_html(html_content):
+def clean_gutenberg_html(html_content, title=None, author=None):
     soup = BeautifulSoup(html_content, 'html.parser')
 
-    # 1. Extract Title and Author (before any cleanup)
-    title_tag = soup.find('h1')
-    author_tag = None
-    
-    if title_tag:
-        # Look for author in the next few elements
-        for sibling in title_tag.find_next_siblings(limit=5):
-            if isinstance(sibling, Tag) and sibling.name in ['h2', 'h3', 'p']:
-                text = sibling.get_text(strip=True)
-                if text and len(text) < 100 and "Chapter" not in text:
-                    author_tag = sibling
-                    break
-
-    # 2. Create New Body
+    # 1. Create New Body
     new_body = soup.new_tag('body')
-    
-    # 3. Add Title Page
-    title_page = soup.new_tag('div', **{'class': 'title-page'})
-    if title_tag:
-        title_page.append(title_tag.extract()) # Move title
-        if author_tag:
-            author_tag_clone = author_tag.extract()
-            author_tag_clone['class'] = author_tag_clone.get('class', []) + ['author']
-            title_page.append(author_tag_clone)
-    new_body.append(title_page)
 
-    # 4. Add Blank Page
-    blank_page = soup.new_tag('div', **{'class': 'blank-page'})
-    new_body.append(blank_page)
+    # 2. Add Title Page (if a title was provided)
+    if title:
+        title_page = soup.new_tag('div', **{'class': 'title-page'})
+
+        # Add title
+        title_tag = soup.new_tag('h1')
+        title_tag.string = title
+        title_page.append(title_tag)
+
+        # Add author
+        if author:
+            author_tag = soup.new_tag('p', **{'class': 'author'})
+            author_tag.string = author
+            title_page.append(author_tag)
+
+        new_body.append(title_page)
+
+        # 3. Add Blank Page
+        blank_page = soup.new_tag('div', **{'class': 'blank-page'})
+        new_body.append(blank_page)
 
     # 5. Extract Preface and Chapters
     # We scan the original body for headers matching our criteria
     # and append them + their content to the new body.
-    
-    section_keywords = ["Préface", "Preface", "Chapitre", "Chapter"]
     
     # Find all potential section headers
     headers = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
     
     current_section_container = None
     
+    # Regex to detect chapter headers (keywords or Roman numerals)
+    chapter_pattern = re.compile(
+        r'^(Préface|Preface|Chapitre|Chapter|I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\b',
+        re.IGNORECASE
+    )
+
     for header in headers:
         text = header.get_text(strip=True)
-        is_target_section = any(keyword.lower() in text.lower() for keyword in section_keywords)
         
-        if is_target_section:
+        if chapter_pattern.match(text):
             # Determine the level of the current header (e.g., 2 for h2)
             try:
                 current_level = int(header.name[1])
@@ -85,9 +83,9 @@ def clean_gutenberg_html(html_content):
                      curr_text = element_to_move.get_text(strip=True)
                      
                      # Check if it's a target section (always stop)
-                     if any(k.lower() in curr_text.lower() for k in section_keywords):
+                     if chapter_pattern.match(curr_text):
                          break
-                     
+
                      # Check if it's a header of same or higher importance (e.g. h2 -> h2, or h2 -> h1)
                      # This implies end of current section and start of an ignored section
                      try:
@@ -118,10 +116,22 @@ def convert_to_pdf():
     if request.content_length > 10 * 1024 * 1024:  # 10 MB limit
         return jsonify({"error": "Request payload is too large."}), 413
 
-    try:
-        html_content = request.data.decode('utf-8')
+    if not request.is_json:
+        return jsonify({"error": "Unsupported Media Type. Must be application/json."}), 415
 
-        cleaned_html = clean_gutenberg_html(html_content)
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON payload."}), 400
+
+        html_content = data.get('html_content')
+        title = data.get('title')
+        author = data.get('author')
+
+        if not html_content:
+            return jsonify({"error": "html_content is required."}), 400
+
+        cleaned_html = clean_gutenberg_html(html_content, title, author)
 
         css_string = """
             @page {
@@ -139,7 +149,7 @@ def convert_to_pdf():
             }
             
             body {
-                font-size: 12pt;
+                font-size: 10pt;
                 font-family: serif;
             }
 
