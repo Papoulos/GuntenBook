@@ -50,7 +50,8 @@ def clean_gutenberg_html(html_content, title=None, author=None):
     
     # Regex to detect chapter headers (keywords or Roman numerals)
     chapter_pattern = re.compile(
-        r'^(Préface|Preface|Chapitre|Chapter|I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\b',
+        r'^(Préface|Preface|Chapitre|Chapter|Lettre)\b.*'
+        r'|^(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\.?\s*$',
         re.IGNORECASE
     )
 
@@ -148,6 +149,7 @@ def convert_to_pdf():
             body {
                 font-size: 10pt;
                 font-family: serif;
+                line-height: 1.5;
             }
 
             /* Title Page Styling */
