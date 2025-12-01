@@ -2,6 +2,7 @@ from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 import io
 import os
+import re
 from weasyprint import HTML, CSS
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -30,36 +31,41 @@ def clean_gutenberg_html(html_content):
     # 2. Create New Body
     new_body = soup.new_tag('body')
     
-    # 3. Add Title Page
-    title_page = soup.new_tag('div', **{'class': 'title-page'})
+    # 3. Add Title Page (if a title was found)
     if title_tag:
+        title_page = soup.new_tag('div', **{'class': 'title-page'})
         title_page.append(title_tag.extract()) # Move title
+
         if author_tag:
             author_tag_clone = author_tag.extract()
             author_tag_clone['class'] = author_tag_clone.get('class', []) + ['author']
             title_page.append(author_tag_clone)
-    new_body.append(title_page)
 
-    # 4. Add Blank Page
-    blank_page = soup.new_tag('div', **{'class': 'blank-page'})
-    new_body.append(blank_page)
+        new_body.append(title_page)
+
+        # 4. Add Blank Page
+        blank_page = soup.new_tag('div', **{'class': 'blank-page'})
+        new_body.append(blank_page)
 
     # 5. Extract Preface and Chapters
     # We scan the original body for headers matching our criteria
     # and append them + their content to the new body.
-    
-    section_keywords = ["Préface", "Preface", "Chapitre", "Chapter"]
     
     # Find all potential section headers
     headers = soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
     
     current_section_container = None
     
+    # Regex to detect chapter headers (keywords or Roman numerals)
+    chapter_pattern = re.compile(
+        r'^(Préface|Preface|Chapitre|Chapter|I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV|XVI|XVII|XVIII|XIX|XX)\b',
+        re.IGNORECASE
+    )
+
     for header in headers:
         text = header.get_text(strip=True)
-        is_target_section = any(keyword.lower() in text.lower() for keyword in section_keywords)
         
-        if is_target_section:
+        if chapter_pattern.match(text):
             # Determine the level of the current header (e.g., 2 for h2)
             try:
                 current_level = int(header.name[1])
@@ -85,9 +91,9 @@ def clean_gutenberg_html(html_content):
                      curr_text = element_to_move.get_text(strip=True)
                      
                      # Check if it's a target section (always stop)
-                     if any(k.lower() in curr_text.lower() for k in section_keywords):
+                     if chapter_pattern.match(curr_text):
                          break
-                     
+
                      # Check if it's a header of same or higher importance (e.g. h2 -> h2, or h2 -> h1)
                      # This implies end of current section and start of an ignored section
                      try:
