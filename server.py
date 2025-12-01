@@ -65,13 +65,40 @@ def clean_gutenberg_html(html_content, title=None, author=None):
         new_body.append(title_page)
         new_body.append(soup.new_tag('div', **{'class': 'blank-page'}))
 
+        # 4. Add a blank page after the title page
+        blank_page = soup.new_tag('div', **{'class': 'blank-page'})
+        new_body.append(blank_page)
+
     # 5. Process content and identify chapters
+    chapter_pattern = re.compile(
+        r'^\s*'                                 # Optional leading whitespace
+        r'(?:'                                  # Start of non-capturing group for keywords
+        r'Chapitre|'
+        r'Livre|'
+        r'Partie|'
+        r'Lettre|'
+        r'Préface|'
+        r'Introduction|'
+        r'Conclusion'
+        r')'                                    # End of keyword group
+        r'(?:\s+[IVXLCDM\d]+)?'                 # Optional space and Roman/Arabic number
+        r'\s*\.?\s*$'                           # Optional trailing whitespace/period
+        r'|'                                    # OR
+        r'^\s*'                                 # Standalone Roman numerals
+        r'M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})'
+        r'\.?\s*$'                              # Optional period and trailing space
+        , re.IGNORECASE
+    )
+    
     if soup.body:
+        # Find all relevant headers and mark them as chapters if they match
         headers = soup.body.find_all(['h1', 'h2', 'h3'])
         for header in headers:
+            # Using .get_text() with strip=True to handle whitespace
             if chapter_pattern.match(header.get_text(strip=True)):
                 header['class'] = header.get('class', []) + ['section-break']
         
+        # Move all content from the old body to the new one
         new_body.extend(list(soup.body.contents))
 
     # 6. Replace Old Body
