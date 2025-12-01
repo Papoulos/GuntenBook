@@ -44,14 +44,18 @@ export const fetchBookContent = async (url: string): Promise<string> => {
   throw new Error("Impossible de récupérer le contenu du livre. Les serveurs Project Gutenberg limitent parfois l'accès.");
 };
 
-export const convertToPdf = async (htmlContent: string): Promise<Blob> => {
+export const convertToPdf = async (htmlContent: string, title: string, author: string): Promise<Blob> => {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   const response = await fetch(`${apiUrl}/api/convert`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'text/html',
+      'Content-Type': 'application/json',
     },
-    body: htmlContent,
+    body: JSON.stringify({
+      html_content: htmlContent,
+      title: title,
+      author: author,
+    }),
   });
 
   if (!response.ok) {

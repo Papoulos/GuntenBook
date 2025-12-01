@@ -15,7 +15,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const blob = await convertToPdf(book.htmlContent);
+      const blob = await convertToPdf(book.htmlContent, book.title, book.author);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
