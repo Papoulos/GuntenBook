@@ -18,19 +18,24 @@ def clean_gutenberg_html(html_content, title=None, author=None):
     # 1. Create New Body
     new_body = soup.new_tag('body')
     
-    # 3. Add Title Page (if a title was found)
-    if title_tag:
+    # 3. Add Title Page (if a title was provided)
+    if title:
         title_page = soup.new_tag('div', **{'class': 'title-page'})
-        title_page.append(title_tag.extract()) # Move title
 
-        if author_tag:
-            author_tag_clone = author_tag.extract()
-            author_tag_clone['class'] = author_tag_clone.get('class', []) + ['author']
-            title_page.append(author_tag_clone)
+        # Create and add the title tag
+        title_tag = soup.new_tag('h1')
+        title_tag.string = title
+        title_page.append(title_tag)
+
+        # Create and add the author tag if an author is provided
+        if author:
+            author_tag = soup.new_tag('p', **{'class': 'author'})
+            author_tag.string = author
+            title_page.append(author_tag)
 
         new_body.append(title_page)
 
-        # 4. Add Blank Page
+        # 4. Add a blank page after the title page
         blank_page = soup.new_tag('div', **{'class': 'blank-page'})
         new_body.append(blank_page)
 
