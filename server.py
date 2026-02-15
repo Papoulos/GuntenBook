@@ -55,10 +55,10 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
     # Matches various section starts for page breaks.
     section_pattern = re.compile(
         r'^\s*'
-        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion|Chapitre premier|Chapitre dernier|Prologue|Épilogue|Table des matières)'
+        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion|Chapitre premier|Chapitre dernier|Prologue|Épilogue)'
         r'\b'
         r'|'
-        r'^\s*M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})\b',
+        r'^\s*(?=[MDCLXVI])M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})\b',
         re.IGNORECASE
     )
     # Matches only "Chapitre..." for illustrations.
