@@ -187,6 +187,15 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
     for booklet in booklets:
         booklet_idx += 1
         sig_here = len(booklet)
+
+        padded_sig = smallest_multiple_of_4_ge(sig_here)
+        if padded_sig > sig_here:
+            if verbose:
+                print(f"[+] Remplissage du livret {booklet_idx} de {sig_here} à {padded_sig} pages.")
+            for _ in range(padded_sig - sig_here):
+                booklet.append(blank_page_entry)
+            sig_here = padded_sig
+
         if verbose:
             print(f"[+] Processing booklet {booklet_idx}/{len(booklets)} (signature={sig_here})")
         sheets_pattern = imposation_for_signature(sig_here)
@@ -262,7 +271,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Générer un livret (booklet) prêt à imprimer.")
     parser.add_argument("input", help="PDF d'entrée (source A4 attendu).")
     parser.add_argument("output", nargs="?", help="PDF de sortie (optionnel). Si absent -> '<input_stem> - Booklet.pdf'")
-    parser.add_argument("--signature", type=int, default=16, help="Pages par carnet (multiple de 4). Default 16")
+    parser.add_argument("--signature", type=int, default=16, help="Pages par carnet. Default 16")
     parser.add_argument("--book", action="store_true", help="Préparer un livre entier pour livret.")
     parser.add_argument("--gb", action="store_true", help="Modifier un livre Gutenberg pour livret.")
     parser.add_argument("--gutter", type=float, default=0.0, help="Gutter (pliure) en mm. Default 0")
@@ -279,9 +288,6 @@ if __name__ == "__main__":
         outp = Path(Path(args.input).stem + " - Booklet.pdf")
     else:
         outp = Path(args.output)
-    if args.signature % 4 != 0:
-        print("La signature doit être multiple de 4.")
-        sys.exit(2)
     if args.verbose:
         print(f"[+] input_path = {args.input}")
         print(f"[+] output_path = {outp}")
