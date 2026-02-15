@@ -11,11 +11,19 @@ interface PrintLayoutProps {
 
 const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [illustrationMode, setIllustrationMode] = useState<'none' | 'fixed' | 'chapter'>('none');
+  const [illustrationCount, setIllustrationCount] = useState(5);
 
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const blob = await convertToPdf(book.htmlContent, book.title, book.author);
+      const blob = await convertToPdf(
+        book.htmlContent,
+        book.title,
+        book.author,
+        illustrationMode,
+        illustrationCount
+      );
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -49,7 +57,33 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ book, onBack }) => {
           <p className="text-xs text-slate-500">{book.author}</p>
         </div>
 
-        <div className="flex items-center justify-end" style={{ minWidth: '150px' }}>
+        <div className="flex items-center justify-end gap-4" style={{ minWidth: '400px' }}>
+          <div className="flex items-center bg-slate-50 p-1 rounded-lg border border-slate-200">
+            <select
+              value={illustrationMode}
+              onChange={(e) => setIllustrationMode(e.target.value as any)}
+              className="bg-transparent text-xs font-medium text-slate-600 outline-none px-2 py-1"
+            >
+              <option value="none">Pas d'illustrations</option>
+              <option value="fixed">Répartition homogène</option>
+              <option value="chapter">Avant chaque chapitre</option>
+            </select>
+
+            {illustrationMode === 'fixed' && (
+              <div className="flex items-center border-l border-slate-200 ml-1 pl-2">
+                <span className="text-[10px] uppercase text-slate-400 font-bold mr-2">Qté:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={illustrationCount}
+                  onChange={(e) => setIllustrationCount(parseInt(e.target.value) || 0)}
+                  className="w-12 bg-white border border-slate-200 rounded text-xs px-1 py-0.5"
+                />
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleDownload}
             disabled={isDownloading}

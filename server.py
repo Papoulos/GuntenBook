@@ -12,7 +12,7 @@ app = Flask(__name__)
 frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
 CORS(app, resources={r"/api/*": {"origins": frontend_url}})
 
-def clean_gutenberg_html(html_content, title=None, author=None):
+def clean_gutenberg_html(html_content, title=None, author=None, illustration_mode='none', illustration_count=0):
     soup = BeautifulSoup(html_content, 'html.parser')
 
     # --- 1. Suppression fiable du HEADER Gutenberg ---
@@ -82,22 +82,70 @@ def clean_gutenberg_html(html_content, title=None, author=None):
             p_author.string = author
             title_page.append(p_author)
         new_body.append(title_page)
-        new_body.append(soup.new_tag('div', **{'class': 'blank-page'}))
+        # On ne met plus de blank-page ici car la gestion gauche/droite va s'en charger
 
     # --- 7. Ajout du contenu nettoyé + marquage des chapitres ---
+    content_elements = []
+    for element in list(soup.body.children):
+        if isinstance(element, Tag):
+            content_elements.append(element)
+        elif isinstance(element, NavigableString) and element.strip():
+            content_elements.append(element)
+
+    # Gestion des illustrations en mode fixe
+    illustration_positions = []
+    if illustration_mode == 'fixed' and illustration_count > 0:
+        def get_text_len(e):
+            if isinstance(e, Tag):
+                return len(e.get_text())
+            return len(str(e))
+
+        # Estimation : 10 pages ~= 25000 caractères
+        limit = 25000
+
+        start_idx = 0
+        current_chars = 0
+        for i, e in enumerate(content_elements):
+            current_chars += get_text_len(e)
+            if current_chars > limit:
+                start_idx = i
+                break
+
+        end_idx = len(content_elements)
+        current_chars = 0
+        for i, e in enumerate(reversed(content_elements)):
+            current_chars += get_text_len(e)
+            if current_chars > limit:
+                end_idx = len(content_elements) - i
+                break
+
+        if end_idx > start_idx and illustration_count > 0:
+            step = (end_idx - start_idx) // (illustration_count + 1)
+            if step > 0:
+                for i in range(1, illustration_count + 1):
+                    illustration_positions.append(start_idx + i * step)
+
     is_first_chapter = True
-    for element in list(soup.body.children):  # list() pour éviter modifications pendant itération
+    for i, element in enumerate(content_elements):
+        # Insertion illustration mode fixe
+        if i in illustration_positions:
+            ill_div = soup.new_tag('div', **{'class': 'illustration-page'})
+            new_body.append(ill_div)
+
         if isinstance(element, Tag) and element.name in ['h1', 'h2', 'h3']:
             text = element.get_text(strip=True)
             if chapter_pattern.match(text):
+                if illustration_mode == 'chapter':
+                    ill_div = soup.new_tag('div', **{'class': 'illustration-page'})
+                    new_body.append(ill_div)
+
                 if not is_first_chapter:
                     element['class'] = element.get('class', []) + ['section-break']
                 else:
                     is_first_chapter = False
-        if isinstance(element, Tag):
-            new_body.append(element)
-        elif isinstance(element, NavigableString) and element.strip():
-            new_body.append(element)
+                    element['class'] = element.get('class', []) + ['first-chapter']
+
+        new_body.append(element)
 
     # --- 8. Remplacement du body ---
     if soup.body:
@@ -121,41 +169,60 @@ def convert_to_pdf():
         html_content = data.get('html_content')
         title = data.get('title')
         author = data.get('author')
+        illustration_mode = data.get('illustration_mode', 'none')
+        illustration_count = int(data.get('illustration_count', 0))
 
         if not html_content:
             return jsonify({"error": "html_content is required."}), 400
 
-        cleaned_html = clean_gutenberg_html(html_content, title, author)
+        cleaned_html = clean_gutenberg_html(html_content, title, author, illustration_mode, illustration_count)
 
         css_string = """
     @page {
         size: A5;
-        margin: 1cm 2cm;
+        margin: 1.5cm 2cm;
         @bottom-center {
             content: counter(page);
         }
     }
+
     /* No page number on the first page (Title Page) */
     @page :first {
         @bottom-center {
             content: none;
         }
     }
-    /* No page number on the second page (Blank Page) */
-    @page :nth(2) {
+
+    /* No page number on illustration pages (always even/left) */
+    .illustration-page {
+        break-before: left;
+        height: 10px; /* needed to be rendered */
+    }
+
+    /* We need a way to suppress page numbers on specific pages in WeasyPrint.
+       Standard CSS doesn't easily allow "no page number if class exists".
+       But we can use a workaround: cover the page number or use a specific @page named area if supported.
+       However, WeasyPrint supports named pages. */
+
+    @page illustration {
         @bottom-center {
             content: none;
         }
     }
 
+    .illustration-page {
+        page: illustration;
+    }
+
     body {
-        font-size: 8pt;
+        font-size: 10pt;
         font-family: serif;
         line-height: 1.5;
     }
     p {
         margin-top: 0;
         margin-bottom: 0.5em;
+        text-align: justify;
     }
     /* Title Page Styling */
     .title-page {
@@ -163,40 +230,44 @@ def convert_to_pdf():
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 190mm; /* A5 height 210mm minus 1cm top + 1cm bottom margins */
+        height: 180mm;
         text-align: center;
-        page-break-after: always;
+        break-after: right; /* Title page is recto, we want next content (or illustration) to follow correctly */
     }
 
     .title-page h1 {
         margin-bottom: 1em;
-        font-size: 2em;
+        font-size: 2.5em;
     }
 
     .title-page .author {
-        font-size: 1.5em;
+        font-size: 1.8em;
         font-style: italic;
     }
-    /* Blank Page Styling */
-    .blank-page {
-        page-break-after: always;
-        content: "";
-        display: block;
-        height: 1px; /* Minimal height to ensure it renders */
-    }
+
     /* Section Breaks */
     .section-break {
-        page-break-before: always;
+        break-before: right;
     }
 
-    /* Ensure h1 always breaks page (except on title page, handled by structure) */
-    h1 {
-        page-break-before: always;
+    .first-chapter {
+        break-before: right;
     }
 
-    /* Override for title page h1 to avoid double break if logic fails */
-    .title-page h1 {
-        page-break-before: avoid;
+    h1, h2, h3 {
+        break-before: right;
+    }
+
+    /* Logic for Illustrations and Chapters:
+       - Illustration must be on LEFT (even)
+       - Chapter must be on RIGHT (odd)
+    */
+    .illustration-page + h1,
+    .illustration-page + h2,
+    .illustration-page + h3,
+    .illustration-page + .section-break,
+    .illustration-page + .first-chapter {
+        break-before: right;
     }
 """
 

@@ -6,6 +6,18 @@
 
 Une application web pour rechercher des livres sur le Projet Gutenberg, visualiser leur contenu HTML et les convertir en PDF.
 
+## Fonctionnalités principales
+
+- **Recherche intégrée** : Trouvez des livres directement depuis le Projet Gutenberg.
+- **Nettoyage automatique** : Suppression des en-têtes et pieds de page légaux de Gutenberg pour un livre propre.
+- **Mise en page professionnelle** : Conversion en PDF au format A5 avec :
+  - Page de titre générée automatiquement.
+  - Sommaire basé sur les chapitres.
+  - Pagination automatique.
+- **Gestion des illustrations** : Option pour insérer des pages vierges (verso) pour vos propres illustrations :
+  - **Mode Homogène** : Répartit un nombre fixe d'illustrations à travers le livre.
+  - **Mode Chapitre** : Insère une page d'illustration avant chaque nouveau chapitre (illustration à gauche, début de chapitre à droite).
+
 ## Exécution locale
 
 ### Prérequis
