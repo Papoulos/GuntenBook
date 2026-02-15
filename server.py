@@ -278,7 +278,7 @@ def convert_to_pdf():
         return send_file(
             pdf_file,
             as_attachment=True,
-            attachment_filename='document.pdf',
+            download_name='document.pdf',
             mimetype='application/pdf'
         )
 
