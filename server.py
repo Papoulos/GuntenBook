@@ -39,25 +39,36 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
             sibling.decompose()
         element_to_delete.decompose()
 
-    # --- 3. Si le body est vide maintenant, on crée un body minimal ---
-    if not soup.body or not soup.body.contents:
-        soup.body = soup.new_tag('body')
+    # --- 3. Si le body est vide maintenant, on s'assure qu'il existe et contient le contenu ---
+    if not soup.body:
+        new_body = soup.new_tag('body')
+        if soup.html:
+            for child in list(soup.html.contents):
+                new_body.append(child.extract())
+            soup.html.append(new_body)
+        else:
+            for child in list(soup.contents):
+                new_body.append(child.extract())
+            soup.append(new_body)
 
     # --- 4. Détection des chapitres pour les sauts de page (amélioré avec plus de variantes) ---
-    chapter_pattern = re.compile(
+    # Matches various section starts for page breaks.
+    section_pattern = re.compile(
         r'^\s*'
-        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion|Chapitre premier|Chapitre dernier|Prologue|Épilogue)'
-        r'(?:\s+[IVXLCDM\d]+)?[\s\.:-]*$'
+        r'(?:Chapitre|Livre|Partie|Lettre|Préface|Introduction|Conclusion|Chapitre premier|Chapitre dernier|Prologue|Épilogue|Table des matières)'
+        r'\b'
         r'|'
-        r'^\s*M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})[\s\.:-]*$',
+        r'^\s*M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})\b',
         re.IGNORECASE
     )
+    # Matches only "Chapitre..." for illustrations.
+    illustration_pattern = re.compile(r'^\s*Chapitre\b', re.IGNORECASE)
 
     # --- Nouvelle étape : Suppression de tout avant le premier chapitre ou préface ---
     first_content_element = None
     for header in soup.body.find_all(['h1', 'h2', 'h3']):
         text = header.get_text(strip=True)
-        if chapter_pattern.match(text):
+        if section_pattern.match(text):
             first_content_element = header
             break
 
@@ -130,13 +141,23 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
         # Insertion illustration mode fixe
         if i in illustration_positions:
             ill_div = soup.new_tag('div', **{'class': 'illustration-page'})
+            ill_div.string = "ILLUSTRATION"
             new_body.append(ill_div)
 
-        if isinstance(element, Tag) and element.name in ['h1', 'h2', 'h3']:
-            text = element.get_text(strip=True)
-            if chapter_pattern.match(text):
-                if illustration_mode == 'chapter':
+        target_header = None
+        if isinstance(element, Tag):
+            if element.name in ['h1', 'h2', 'h3']:
+                target_header = element
+            else:
+                # Search for a header within the tag (handles nested chapters)
+                target_header = element.find(['h1', 'h2', 'h3'])
+
+        if target_header:
+            text = target_header.get_text(strip=True)
+            if section_pattern.match(text):
+                if illustration_mode == 'chapter' and illustration_pattern.match(text):
                     ill_div = soup.new_tag('div', **{'class': 'illustration-page'})
+                    ill_div.string = "ILLUSTRATION"
                     new_body.append(ill_div)
 
                 if not is_first_chapter:
@@ -194,16 +215,6 @@ def convert_to_pdf():
     }
 
     /* No page number on illustration pages (always even/left) */
-    .illustration-page {
-        break-before: left;
-        height: 10px; /* needed to be rendered */
-    }
-
-    /* We need a way to suppress page numbers on specific pages in WeasyPrint.
-       Standard CSS doesn't easily allow "no page number if class exists".
-       But we can use a workaround: cover the page number or use a specific @page named area if supported.
-       However, WeasyPrint supports named pages. */
-
     @page illustration {
         @bottom-center {
             content: none;
@@ -212,6 +223,15 @@ def convert_to_pdf():
 
     .illustration-page {
         page: illustration;
+        break-before: left;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 180mm; /* A5 height approx */
+        font-size: 2em;
+        color: #ccc;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
     }
 
     body {
@@ -262,11 +282,7 @@ def convert_to_pdf():
        - Illustration must be on LEFT (even)
        - Chapter must be on RIGHT (odd)
     */
-    .illustration-page + h1,
-    .illustration-page + h2,
-    .illustration-page + h3,
-    .illustration-page + .section-break,
-    .illustration-page + .first-chapter {
+    .illustration-page + * {
         break-before: right;
     }
 """
