@@ -208,9 +208,12 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             rv_i = rv - 1
             rect_left, rect_right = compute_embed_rects(landscape_w, landscape_h, gutter_pt, margin_pts, overlap_pt=overlap_pt)
             # apply creep compensation if enabled
+            # progressive shift: outermost sheet (sheet_idx=0) has 0 creep,
+            # innermost sheet (sheet_idx=sheets_count-1) has max creep.
             if creep_per_sheet_pt > 0 and sheets_count > 0:
-                creep_for_sheet = creep_per_sheet_pt * max(0, (sheets_count - 1 - sheet_idx))
+                creep_for_sheet = creep_per_sheet_pt * sheet_idx
                 shift_each_side = creep_for_sheet / 2.0
+                # Content on left page moves RIGHT (towards gutter), content on right page moves LEFT (towards gutter)
                 rect_left = fitz.Rect(rect_left.x0 + shift_each_side, rect_left.y0, rect_left.x1 + shift_each_side, rect_left.y1)
                 rect_right = fitz.Rect(rect_right.x0 - shift_each_side, rect_right.y0, rect_right.x1 - shift_each_side, rect_right.y1)
                 if verbose:
@@ -220,6 +223,19 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
                 print(f"[DEBUG] rect_right: {rect_right} (gutter_mm={gutter_mm} overlap_mm={overlap_mm} creep_mm={creep_mm})")
             # Recto
             page_recto = out_doc.new_page(width=landscape_w, height=landscape_h)
+
+            # Collating mark (Témoin de dos) on the fold
+            # Offset by 10mm down for each new booklet
+            mark_y_start = mm_to_pt(10 * booklet_idx)
+            mark_y_end = mark_y_start + mm_to_pt(7)
+            fold_x = landscape_w / 2.0
+            # Draw on the fold (visible when folded)
+            page_recto.draw_line(fitz.Point(fold_x, mark_y_start), fitz.Point(fold_x, mark_y_end), color=(0.7, 0.7, 0.7), width=1)
+
+            # Fold mark (Marque de pliage) only on the exterior sheet
+            if sheet_idx == 0:
+                page_recto.draw_line(fitz.Point(fold_x, 0), fitz.Point(fold_x, landscape_h), color=(0.8, 0.8, 0.8), width=0.3)
+
             # left recto
             sdoc, spno = booklet[lr_i]
             try:
@@ -242,6 +258,14 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
                     print(f"[!] Warning inserting recto-right: {e}")
             # Verso
             page_verso = out_doc.new_page(width=landscape_w, height=landscape_h)
+
+            # Draw collating mark on verso as well to ensure visibility
+            page_verso.draw_line(fitz.Point(fold_x, mark_y_start), fitz.Point(fold_x, mark_y_end), color=(0.7, 0.7, 0.7), width=1)
+
+            # Fold mark on verso exterior sheet
+            if sheet_idx == 0:
+                page_verso.draw_line(fitz.Point(fold_x, 0), fitz.Point(fold_x, landscape_h), color=(0.8, 0.8, 0.8), width=0.3)
+
             sdoc, spno = booklet[lv_i]
             try:
                 src_rect = sdoc[spno].rect

@@ -39,6 +39,10 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
             sibling.decompose()
         element_to_delete.decompose()
 
+    # --- 2.5 Langue française pour les césures ---
+    if soup.html:
+        soup.html['lang'] = 'fr'
+
     # --- 3. Si le body est vide maintenant, on s'assure qu'il existe et contient le contenu ---
     if not soup.body:
         new_body = soup.new_tag('body')
@@ -199,12 +203,27 @@ def convert_to_pdf():
         cleaned_html = clean_gutenberg_html(html_content, title, author, illustration_mode, illustration_count)
 
         css_string = """
+    @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&display=swap');
+
     @page {
         size: A5;
-        margin: 1.5cm 2cm;
+        margin-top: 20mm;
+        margin-bottom: 20mm;
         @bottom-center {
             content: counter(page);
+            font-family: 'EB Garamond', serif;
+            font-size: 10pt;
         }
+    }
+
+    @page :left {
+        margin-left: 15mm;
+        margin-right: 25mm;
+    }
+
+    @page :right {
+        margin-left: 25mm;
+        margin-right: 15mm;
     }
 
     /* No page number on the first page (Title Page) */
@@ -227,7 +246,7 @@ def convert_to_pdf():
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 180mm; /* A5 height approx */
+        height: 100%;
         font-size: 2em;
         color: #ccc;
         text-transform: uppercase;
@@ -235,22 +254,31 @@ def convert_to_pdf():
     }
 
     body {
-        font-size: 10pt;
-        font-family: serif;
-        line-height: 1.5;
+        font-size: 11pt;
+        font-family: 'EB Garamond', serif;
+        line-height: 1.35;
+        text-rendering: optimizeLegibility;
     }
+
     p {
-        margin-top: 0;
-        margin-bottom: 0.5em;
+        margin: 0;
+        text-indent: 5mm;
         text-align: justify;
+        hyphens: auto;
     }
+
+    /* First paragraph after a title has no indent */
+    h1 + p, h2 + p, h3 + p, .section-break + p, .first-chapter + p, .title-page + p {
+        text-indent: 0;
+    }
+
     /* Title Page Styling */
     .title-page {
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 180mm;
+        height: 100%;
         text-align: center;
         break-after: right; /* Title page is recto, we want next content (or illustration) to follow correctly */
     }
@@ -258,11 +286,13 @@ def convert_to_pdf():
     .title-page h1 {
         margin-bottom: 1em;
         font-size: 2.5em;
+        text-indent: 0;
     }
 
     .title-page .author {
         font-size: 1.8em;
         font-style: italic;
+        text-indent: 0;
     }
 
     /* Section Breaks */
@@ -276,6 +306,7 @@ def convert_to_pdf():
 
     h1, h2, h3 {
         break-before: right;
+        text-indent: 0;
     }
 
     /* Logic for Illustrations and Chapters:
