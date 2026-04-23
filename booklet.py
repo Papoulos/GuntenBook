@@ -209,11 +209,23 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             rect_left, rect_right = compute_embed_rects(landscape_w, landscape_h, gutter_pt, margin_pts, overlap_pt=overlap_pt)
             # apply creep compensation if enabled
             # progressive shift: outermost sheet (sheet_idx=0) has 0 creep,
-            # innermost sheet (sheet_idx=sheets_count-1) has max creep.
-            if creep_per_sheet_pt > 0 and sheets_count > 0:
-                creep_for_sheet = creep_per_sheet_pt * sheet_idx
-                shift_each_side = creep_for_sheet / 2.0
-                # Content on left page moves RIGHT (towards gutter), content on right page moves LEFT (towards gutter)
+            # each subsequent sheet moves inwards by creep_mm.
+            if creep_mm > 0:
+                shift_each_side = mm_to_pt(creep_mm * sheet_idx)
+
+                # To reduce inner margin:
+                # Left page (recto-left is usually a verso/even page if it's the last page of the signature)
+                # Actually, in booklet imposition:
+                # Recto: [N, 1], [N-2, 3]...
+                # Page N is left, Page 1 is right.
+                # Page 1 (right) is a RECTO (odd). Inner margin is LEFT. To reduce it, move content LEFT.
+                # Page N (left) is a VERSO (even). Inner margin is RIGHT. To reduce it, move content RIGHT.
+
+                # rect_left is the LEFT side of the A4 landscape sheet.
+                # rect_right is the RIGHT side of the A4 landscape sheet.
+                # To REDUCE the inner margin, move the content TOWARDS the center fold.
+                # Left page: inner margin is on the RIGHT. Move content RIGHT (+).
+                # Right page: inner margin is on the LEFT. Move content LEFT (-).
                 rect_left = fitz.Rect(rect_left.x0 + shift_each_side, rect_left.y0, rect_left.x1 + shift_each_side, rect_left.y1)
                 rect_right = fitz.Rect(rect_right.x0 - shift_each_side, rect_right.y0, rect_right.x1 - shift_each_side, rect_right.y1)
                 if verbose:
