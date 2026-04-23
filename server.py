@@ -280,7 +280,7 @@ def convert_to_pdf():
         align-items: center;
         height: 100%;
         text-align: center;
-        break-after: right; /* Title page is recto, we want next content (or illustration) to follow correctly */
+        break-after: right; /* Title page is recto (p. 1), forces a blank verso (p. 2) so next starts on p. 3 */
     }
 
     .title-page h1 {
