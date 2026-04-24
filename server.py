@@ -42,18 +42,34 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
     # --- 2.5 Langue française pour les césures ---
     if soup.html:
         soup.html['lang'] = 'fr'
+    else:
+        # Wrap everything in <html> and set lang
+        new_html = soup.new_tag('html', lang='fr')
+        for child in list(soup.contents):
+            new_html.append(child.extract())
+        soup.append(new_html)
 
-    # --- 3. Si le body est vide maintenant, on s'assure qu'il existe et contient le contenu ---
+    # --- 3. S'assurer qu'on a une structure propre <html><body>...</body></html> ---
+    if not soup.html:
+        html_tag = soup.new_tag('html', lang='fr')
+        for child in list(soup.contents):
+            html_tag.append(child.extract())
+        soup.append(html_tag)
+
     if not soup.body:
-        new_body = soup.new_tag('body')
-        if soup.html:
-            for child in list(soup.html.contents):
-                new_body.append(child.extract())
-            soup.html.append(new_body)
-        else:
-            for child in list(soup.contents):
-                new_body.append(child.extract())
-            soup.append(new_body)
+        body_tag = soup.new_tag('body')
+        for child in list(soup.html.contents):
+            body_tag.append(child.extract())
+        soup.html.append(body_tag)
+
+    # Nettoyer les éventuels doublons de body (arrive si on a wrappé un fragment)
+    bodies = soup.find_all('body')
+    if len(bodies) > 1:
+        main_body = bodies[0]
+        for extra in bodies[1:]:
+            for child in list(extra.contents):
+                main_body.append(child.extract())
+            extra.decompose()
 
     # --- 4. Détection des chapitres pour les sauts de page (amélioré avec plus de variantes) ---
     # Matches various section starts for page breaks.
@@ -172,9 +188,12 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
 
         new_body.append(element)
 
-    # --- 8. Remplacement du body ---
+    # --- 8. Remplacement du contenu du body par le nouveau contenu propre ---
+    # On vide le body actuel pour éviter les résidus de styles ou de balises Gutenberg
     if soup.body:
-        soup.body.replace_with(new_body)
+        soup.body.clear()
+        for child in list(new_body.contents):
+            soup.body.append(child)
     else:
         soup.append(new_body)
 
@@ -206,9 +225,8 @@ def convert_to_pdf():
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&display=swap');
 
     @page {
-        size: A5;
-        margin-top: 20mm;
-        margin-bottom: 20mm;
+        size: 148.5mm 210mm;
+        margin: 0;
         @bottom-center {
             content: counter(page);
             font-family: 'EB Garamond', serif;
@@ -217,40 +235,45 @@ def convert_to_pdf():
     }
 
     @page :left {
-        margin-left: 15mm;
-        margin-right: 25mm;
+        margin-top: 20mm !important;
+        margin-bottom: 20mm !important;
+        margin-left: 15mm !important;
+        margin-right: 25mm !important;
     }
 
     @page :right {
-        margin-left: 25mm;
-        margin-right: 15mm;
+        margin-top: 20mm !important;
+        margin-bottom: 20mm !important;
+        margin-left: 25mm !important;
+        margin-right: 15mm !important;
     }
 
-    /* No page number on the first page (Title Page) */
     @page :first {
+        margin-top: 20mm !important;
+        margin-bottom: 20mm !important;
+        margin-left: 25mm !important;
+        margin-right: 15mm !important;
         @bottom-center {
             content: none;
         }
     }
 
-    /* No page number on illustration pages (always even/left) */
+    @page :blank {
+        @bottom-center {
+            content: none;
+        }
+    }
+
     @page illustration {
+        margin: 20mm 25mm 20mm 15mm !important;
         @bottom-center {
             content: none;
         }
     }
 
-    .illustration-page {
-        page: illustration;
-        break-before: left;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        font-size: 2em;
-        color: #ccc;
-        text-transform: uppercase;
-        letter-spacing: 0.2em;
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     body {
@@ -278,7 +301,7 @@ def convert_to_pdf():
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        height: 100%;
+        height: 170mm; /* Fixed height to avoid overflow */
         text-align: center;
         break-after: right; /* Title page is recto (p. 1), forces a blank verso (p. 2) so next starts on p. 3 */
     }
@@ -307,6 +330,7 @@ def convert_to_pdf():
     h1, h2, h3 {
         break-before: right;
         text-indent: 0;
+        margin: 0;
     }
 
     /* Logic for Illustrations and Chapters:

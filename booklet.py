@@ -42,33 +42,26 @@ def make_blank_page(width_pt, height_pt):
 # ---------------- géométrie / scaling ----------------
 def compute_embed_rects(page_width: float, page_height: float, gutter_pt: float, margin_tlbr, overlap_pt: float = 0.0):
     top, leftm, bottom, rightm = margin_tlbr
-    inner_width = page_width - leftm - rightm
-    inner_height = page_height - top - bottom
-    half_w = inner_width / 2.0
-    if gutter_pt == 0:
-        left_x0 = leftm
-        left_x1 = leftm + half_w + (overlap_pt / 2.0)
-        right_x0 = leftm + half_w - (overlap_pt / 2.0)
-        right_x1 = leftm + 2 * half_w
-        y0 = top
-        y1 = top + inner_height
-        rect_left = fitz.Rect(left_x0, y0, left_x1, y1)
-        rect_right = fitz.Rect(right_x0, y0, right_x1, y1)
-        return rect_left, rect_right
-    offset = gutter_pt / 2.0
-    left_x0 = leftm - offset
-    left_x1 = leftm + half_w - offset
-    right_x0 = leftm + half_w + offset
-    right_x1 = leftm + 2 * half_w + offset
-    if overlap_pt > 0:
-        left_x1 += overlap_pt / 2.0
-        right_x0 -= overlap_pt / 2.0
-    y0 = top
-    y1 = top + inner_height
+    half_w = page_width / 2.0
+
+    # Each page in the spread should be exactly A5 portrait (or half of A4 landscape)
+    # A4 landscape is 297mm x 210mm. Half is 148.5mm x 210mm.
+
+    # Left page of the spread
+    left_x0 = 0
+    left_x1 = half_w
+
+    # Right page of the spread
+    right_x0 = half_w
+    right_x1 = page_width
+
+    y0 = 0
+    y1 = page_height
+
     rect_left = fitz.Rect(left_x0, y0, left_x1, y1)
     rect_right = fitz.Rect(right_x0, y0, right_x1, y1)
     return rect_left, rect_right
-def fit_src_rect_into_target(target_rect: fitz.Rect, src_rect: fitz.Rect, scale_mode: str = "fit"):
+def fit_src_rect_into_target(target_rect: fitz.Rect, src_rect: fitz.Rect, scale_mode: str = "fit", align: str = "center"):
     target_w = target_rect.width
     target_h = target_rect.height
     src_w = src_rect.width
@@ -82,7 +75,14 @@ def fit_src_rect_into_target(target_rect: fitz.Rect, src_rect: fitz.Rect, scale_
         scale = min(target_w / src_w, target_h / src_h)
         new_w = src_w * scale
         new_h = src_h * scale
-    x0 = target_rect.x0 + (target_w - new_w) / 2.0
+
+    if align == "left":
+        x0 = target_rect.x0
+    elif align == "right":
+        x0 = target_rect.x1 - new_w
+    else:
+        x0 = target_rect.x0 + (target_w - new_w) / 2.0
+
     y0 = target_rect.y0 + (target_h - new_h) / 2.0
     x1 = x0 + new_w
     y1 = y0 + new_h
@@ -214,22 +214,12 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
                 shift_each_side = mm_to_pt(creep_mm * sheet_idx)
 
                 # To reduce inner margin:
-                # Left page (recto-left is usually a verso/even page if it's the last page of the signature)
-                # Actually, in booklet imposition:
-                # Recto: [N, 1], [N-2, 3]...
-                # Page N is left, Page 1 is right.
-                # Page 1 (right) is a RECTO (odd). Inner margin is LEFT. To reduce it, move content LEFT.
-                # Page N (left) is a VERSO (even). Inner margin is RIGHT. To reduce it, move content RIGHT.
-
-                # rect_left is the LEFT side of the A4 landscape sheet.
-                # rect_right is the RIGHT side of the A4 landscape sheet.
-                # To REDUCE the inner margin, move the content TOWARDS the center fold.
-                # Left page: inner margin is on the RIGHT. Move content RIGHT (+).
-                # Right page: inner margin is on the LEFT. Move content LEFT (-).
+                # Left page of the spread moves RIGHT (+), Right page moves LEFT (-).
+                # This ensures both move TOWARDS the fold.
                 rect_left = fitz.Rect(rect_left.x0 + shift_each_side, rect_left.y0, rect_left.x1 + shift_each_side, rect_left.y1)
                 rect_right = fitz.Rect(rect_right.x0 - shift_each_side, rect_right.y0, rect_right.x1 - shift_each_side, rect_right.y1)
                 if verbose:
-                    print(f"[DEBUG] sheet_idx={sheet_idx} creep_for_sheet_pt={creep_for_sheet:.3f} shift_each_side={shift_each_side:.3f}")
+                    print(f"[DEBUG] sheet_idx={sheet_idx} shift_each_side={shift_each_side:.3f}")
             if verbose:
                 print(f"[DEBUG] rect_left: {rect_left}")
                 print(f"[DEBUG] rect_right: {rect_right} (gutter_mm={gutter_mm} overlap_mm={overlap_mm} creep_mm={creep_mm})")
@@ -253,7 +243,11 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             try:
                 src_rect = sdoc[spno].rect
                 target_rect = rect_left
-                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode)
+                # Standard Booklet Alignment:
+                # Left page of spread -> Spine is on the RIGHT. Align content RIGHT.
+                # Right page of spread -> Spine is on the LEFT. Align content LEFT.
+                # This ensures that inner margins (at the fold) are perfectly preserved.
+                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode, align="right")
                 page_recto.show_pdf_page(placed_rect, sdoc, spno)
             except Exception as e:
                 if verbose:
@@ -263,7 +257,7 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             try:
                 src_rect = sdoc[spno].rect
                 target_rect = rect_right
-                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode)
+                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode, align="left")
                 page_recto.show_pdf_page(placed_rect, sdoc, spno)
             except Exception as e:
                 if verbose:
@@ -282,7 +276,7 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             try:
                 src_rect = sdoc[spno].rect
                 target_rect = rect_left
-                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode)
+                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode, align="right")
                 page_verso.show_pdf_page(placed_rect, sdoc, spno)
             except Exception as e:
                 if verbose:
@@ -291,7 +285,7 @@ def create_booklet_pdf(input_path, output_path, signature=16, gutter_mm=0.0,
             try:
                 src_rect = sdoc[spno].rect
                 target_rect = rect_right
-                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode)
+                placed_rect = fit_src_rect_into_target(target_rect, src_rect, scale_mode=scale_mode, align="left")
                 page_verso.show_pdf_page(placed_rect, sdoc, spno)
             except Exception as e:
                 if verbose:
