@@ -10,8 +10,9 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 app = Flask(__name__)
 
 # Configure CORS
-# Allow both localhost:3000 and localhost:3001 as they are common dev ports
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
+# Use a more permissive configuration to avoid issues with localhost vs 127.0.0.1
+# and different developer ports.
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 def clean_gutenberg_html(html_content, title=None, author=None, illustration_mode='none', illustration_count=0):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -214,7 +215,12 @@ def fetch_gutenberg():
         return jsonify({"error": f"Domain {parsed_url.netloc} is not allowed."}), 403
 
     try:
-        response = requests.get(url, timeout=10)
+        app.logger.info(f"Fetching from Gutenberg: {url}")
+        # Add a realistic User-Agent to avoid being blocked by some servers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, timeout=15, headers=headers)
         response.raise_for_status()
 
         # Check if content type is likely HTML
@@ -231,8 +237,10 @@ def fetch_gutenberg():
 
 @app.route('/api/convert', methods=['POST'])
 def convert_to_pdf():
+    app.logger.info(f"PDF conversion request received from {request.origin}")
     # Limit the size of the incoming request to 50MB to handle large books
     if request.content_length and request.content_length > 50 * 1024 * 1024:
+        app.logger.warning(f"Payload too large: {request.content_length} bytes")
         return jsonify({"error": "Request payload is too large (max 50MB)."}), 413
 
     if not request.is_json:
