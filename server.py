@@ -3,6 +3,7 @@ from flask_cors import CORS
 import io
 import os
 import re
+import requests
 from weasyprint import HTML, CSS
 from bs4 import BeautifulSoup, NavigableString, Tag
 
@@ -198,6 +199,35 @@ def clean_gutenberg_html(html_content, title=None, author=None, illustration_mod
         soup.append(new_body)
 
     return str(soup)
+
+@app.route('/api/fetch-gutenberg', methods=['GET'])
+def fetch_gutenberg():
+    url = request.args.get('url')
+    if not url:
+        return jsonify({"error": "URL is required."}), 400
+
+    # Security check: only allow Gutenberg domains
+    allowed_domains = ['gutenberg.org', 'www.gutenberg.org']
+    from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    if parsed_url.netloc not in allowed_domains:
+        return jsonify({"error": "Only Gutenberg domains are allowed."}), 403
+
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+
+        # Check if content type is likely HTML
+        content_type = response.headers.get('Content-Type', '').lower()
+        if 'text/html' not in content_type and not url.endswith(('.html', '.htm')):
+             # If we can't confirm it's HTML, we might still want to try if it looks like it
+             # but Project Gutenberg usually returns text/html
+             pass
+
+        return response.text
+    except requests.RequestException as e:
+        app.logger.error(f"Failed to fetch from Gutenberg: {e}")
+        return jsonify({"error": "Could not fetch content from Project Gutenberg."}), 502
 
 @app.route('/api/convert', methods=['POST'])
 def convert_to_pdf():
