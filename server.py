@@ -10,8 +10,8 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 app = Flask(__name__)
 
 # Configure CORS
-frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
-CORS(app, resources={r"/api/*": {"origins": frontend_url}})
+# Allow both localhost:3000 and localhost:3001 as they are common dev ports
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:3001"]}})
 
 def clean_gutenberg_html(html_content, title=None, author=None, illustration_mode='none', illustration_count=0):
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -207,11 +207,11 @@ def fetch_gutenberg():
         return jsonify({"error": "URL is required."}), 400
 
     # Security check: only allow Gutenberg domains
-    allowed_domains = ['gutenberg.org', 'www.gutenberg.org']
+    allowed_domains = ['gutenberg.org', 'www.gutenberg.org', 'archive.org'] # Expanded
     from urllib.parse import urlparse
     parsed_url = urlparse(url)
-    if parsed_url.netloc not in allowed_domains:
-        return jsonify({"error": "Only Gutenberg domains are allowed."}), 403
+    if not any(parsed_url.netloc.endswith(domain) for domain in allowed_domains):
+        return jsonify({"error": f"Domain {parsed_url.netloc} is not allowed."}), 403
 
     try:
         response = requests.get(url, timeout=10)
@@ -231,9 +231,9 @@ def fetch_gutenberg():
 
 @app.route('/api/convert', methods=['POST'])
 def convert_to_pdf():
-    # Limit the size of the incoming request
-    if request.content_length > 10 * 1024 * 1024:  # 10 MB limit
-        return jsonify({"error": "Request payload is too large."}), 413
+    # Limit the size of the incoming request to 50MB to handle large books
+    if request.content_length and request.content_length > 50 * 1024 * 1024:
+        return jsonify({"error": "Request payload is too large (max 50MB)."}), 413
 
     if not request.is_json:
         return jsonify({"error": "Unsupported Media Type. Must be application/json."}), 415
