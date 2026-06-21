@@ -11,37 +11,22 @@ export const searchBooks = async (query: string, language: string = 'fr'): Promi
 };
 
 export const fetchBookContent = async (url: string): Promise<string> => {
-  // Force HTTPS to avoid mixed content issues
-  const targetUrl = url.replace(/^http:\/\//i, 'https://');
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
   
-  // Strategy: Try multiple CORS proxies in a specific order
-  const proxies = [
-    (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-    (u: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-    (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`
-  ];
+  try {
+    const response = await fetch(`${apiUrl}/api/fetch-gutenberg?url=${encodeURIComponent(url)}`);
 
-  for (const createProxyUrl of proxies) {
-    try {
-      const proxyUrl = createProxyUrl(targetUrl);
-      console.log(`Tentative via proxy: ${proxyUrl}`);
-      
-      const response = await fetch(proxyUrl);
-      if (response.ok) {
-        const text = await response.text();
-        
-        // Basic validation
-        if (text.length > 500) {
-          return text;
-        }
-      }
-    } catch (error) {
-      console.warn(`Erreur proxy:`, error);
-      // Continue to next proxy
+    if (response.ok) {
+      const text = await response.text();
+      return text;
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Impossible de récupérer le contenu du livre via le serveur.");
     }
+  } catch (error: any) {
+    console.error(`Erreur lors de la récupération du livre:`, error);
+    throw error;
   }
-
-  throw new Error("Impossible de récupérer le contenu du livre. Les serveurs Project Gutenberg limitent parfois l'accès.");
 };
 
 export const convertToPdf = async (
